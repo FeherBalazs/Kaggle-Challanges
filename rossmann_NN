@@ -1,0 +1,214 @@
+import numpy as np
+import pandas as pd
+import csv
+import time
+from keras.models import Sequential
+from keras.layers.core import Dense, Activation, Dropout
+from keras.optimizers import RMSprop
+from keras.optimizers import Adam
+from keras.layers.advanced_activations import PReLU
+from keras.layers.normalization import BatchNormalization
+
+model = Sequential()
+model.add(Dense(50, input_dim=1176, init='he_normal'))
+model.add(PReLU())
+#model.add(Activation('relu'))
+#model.add(BatchNormalization())
+#model.add(Dropout(0.5))
+
+model.add(Dense(50, init='he_normal'))
+model.add(PReLU())
+#model.add(Activation('relu'))
+#model.add(BatchNormalization())
+#model.add(Dropout(0.5))
+
+#model.add(Dense(50, init='he_normal'))
+#model.add(PReLU())
+#model.add(BatchNormalization())
+#model.add(Dropout(0.5))
+
+model.add(Dense(1, init='he_normal'))
+model.add(Activation('sigmoid'))
+
+#rmsprop = RMSprop(lr=0.001, rho=0.9, epsilon=1e-6)
+#model.compile(loss='mse', optimizer=rmsprop)
+
+adam = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-8)
+model.compile(loss='mse', optimizer=adam)
+
+'''
+Feature selection and parameter setting
+'''
+train_file = 'train_85_split.csv'
+test_file = 'test_15_split.csv'
+num_epochs = 10
+batch_size = 1
+logging = True  #sets whether to write log file and create submission files
+
+def feature_list():
+    features = v.vect(1115, (int(row['Store']))) + \
+        [row['Open']] +\
+        v.vect(7, (int(row['DayOfWeek']))) + \
+        v.vect(3, (int(row['Year'])-2013)) + \
+        v.vect(12, (int(row['Month']))) + \
+        v.vect(31, (int(row['Day']))) + \
+        [row['Promo']] + \
+        [row['Promo2']] + \
+        [row['PromoOpen']] + \
+        v.vect(4, (int(row['StoreType'])))
+        #[row['CompetitionDistance']] + \
+        #[row['CompetitionOpenNull']]
+        #[row['CompetitionDistanceLog']] + \
+        #[row['CompetitionOpenNull']]
+        #[row['CompetitionOpenLog']] +\
+        #[row['CompetitionOpen']] + \        
+        #v.vect(6, (int(row['DaysLeft']))) + \
+        #v.vect(6, (int(row['DaysAfter'])))+ \
+        #[row['EurUsdRate']] + \
+        #v.vect(3, (int(row['Assortment'])))+ \
+        #v.vect(52, (int(row['WeekOfYear'])))+ \
+        #v.vect(4, (int(row['StateHoliday']))) + \
+        #[row['SchoolHoliday']]+ \
+        #[row['WeatherBad']] + \
+        #[row['IsPromoMonth']]
+    return features
+
+
+class Vectorizer():
+    def __init__(self):
+        self.vectCache = dict()
+
+    def vect(self, size, idx):
+        """Retrieves a vector such as [0,0,0,...,idx=1,0,0,...,0] where the size of the vector is 'size'
+        and all items are zero except the 'idx' numbered element, which is one. 
+        Note: 'idx' numbering starts from 1..size, not from zero, it is 1-indexed.
+        """
+        if size not in self.vectCache:
+            print("Vectorizer: Generating vectors for size", size)
+            arr = []
+            for i in range(size):
+                e = [0] * size
+                e[i] = 1.0
+                arr.append(e)
+            self.vectCache[size] = arr
+        return self.vectCache[size][idx-1]
+
+v = Vectorizer()
+
+'''
+Training model
+'''
+training_subset_size = 10000    #it is required to work on subsets because full training file cannot fit memory 
+                                #when vectorized
+loss = 1
+losslog = []
+Time = (time.strftime("Day:%d Time:%H:%M"))
+
+df = pd.DataFrame.from_csv(train_file)
+print ("Assembling training set and training neural network...")
+
+for epoch in range(1, num_epochs + 1):
+    n = 1
+    i = 1
+    list_a = []
+    list_b = []
+    
+    df = df.reindex(np.random.permutation(df.index))    #shuffle dataframe
+    for index, row in df.iterrows():
+        if i <= training_subset_size:
+            features = feature_list()
+            list_a.append(features)
+            list_b.append(row['Sales'])
+            i = i+1
+        
+        else:
+            x = np.array(list_a, dtype=float)
+            y = np.array(list_b, dtype=float)
+            model.fit(x, y, batch_size=batch_size, nb_epoch=1, verbose=0)  #this is where training happens in
+                                                                           #Keras
+            i = 1
+            list_a = []
+            list_b = []        
+        
+        if (n % 10000 == 0):        #this is for training status monitoring
+            print (n)
+        n = n + 1
+   
+    '''
+    Evaluating model
+    '''
+    n = 1
+    list_a = []
+    list_b = []
+    with open(test_file) as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            features = feature_list()
+            list_a.append(features)
+            list_b.append(row['Sales'])
+            
+            if (n % 10000 == 0):
+                print (n)
+            n = n + 1
+            
+        test_x = np.array(list_a, dtype=float)
+        test_y = np.array(list_b, dtype=float)
+        
+        print ("Performance of the model over validation data (loss score): \
+        " + str(model.evaluate(test_x, test_y, verbose=2)) + " at epoch:" + str(epoch))
+        
+        if logging == True:
+            losslog.append(("Performance of the model over validation data (loss score): \
+            " + str(model.evaluate(test_x, test_y, verbose=2)) + " at epoch:" + str(epoch) \
+            + "_"+time.strftime("Day:%d Time:%H:%M")))
+            losslog_df = pd.DataFrame(losslog)
+            losslog_df.to_csv('Outputs/losslog_'+Time+'_train:_'+str(train_file)+'_test:_'+str(test_file) \
+                              +'_batch_'+str(batch_size)+'_epoch_'+str(num_epochs)+'.csv', index_label='Id')
+    
+    if model.evaluate(test_x, test_y, verbose=2) < loss and logging == True:
+        
+        '''
+        Creating submission file on test.csv
+        There is missing data in test.csv in column 'Open'. I treat missing data with
+        assuming it is open (i.e. I set it to '1').
+        '''
+        print ("Testing neural network on test file and writing results into submission file...")
+
+        results = []
+        with open('scaled_test.csv') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                list_a = []
+                features = feature_list()
+
+                if row['Open'] == '':
+                    op = [1.0]
+                else:
+                    op = [row['Open']]
+
+                list_a.append(features)
+                x = np.array(list_a, dtype=float)
+
+                if row['Open'] == '1.0':                      #here I make the conditional that if 
+                    result = model.predict(x, batch_size=1)   #store is closed then sales on that day
+                else:                                         #is automatically 0
+                    result = [np.array([0])]
+
+                results.extend(result)
+
+        '''
+        Writing results into submission.csv
+        '''
+
+        results = pd.DataFrame(results)
+        results.T
+        results = (np.exp(results * 10.634700933902529) - 1) * 0.985
+
+        results.columns = ['Sales']
+        results.index += 1
+        results.to_csv('Outputs/submission_train_'+str(train_file)+'_test_'+str(test_file) \
+                       +'_batch_'+str(batch_size) +'_best_loss:_'+str(model.evaluate(test_x, test_y, verbose=2)) \
+                       +'_epoch:_'+str(epoch)+"_"+time.strftime("Day:%d Time:%H:%M")+'.csv', index_label='Id')
+        #
+        print ("Great job BalKryTonAd!!! Check your results!!!")
+        loss = model.evaluate(test_x, test_y, verbose=2)
