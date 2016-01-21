@@ -1,0 +1,61 @@
+------------------
+scale_test
+------------------
+
+from __future__ import division
+from pandas import *
+import pandas as pd
+import numpy as np
+
+'''
+Code for scaling relevant features for use in neural networks.
+'''
+
+def featureScaling(arr):
+    min_arr = min(arr); max_arr = max(arr); new_arr = []
+    for i in arr:
+        new_arr.append((i - min_arr) / (max_arr - min_arr))
+    return new_arr
+
+
+'''
+Test the feature scaler with the real data!
+'''
+
+df = pd.read_csv('test_balazs2.csv')
+df['CompetitionDistanceLog'] = df.CompetitionDistance.apply(np.log1p)
+df.CompetitionOpen = df.CompetitionOpen + 31
+df['CompetitionOpenLog'] = df.CompetitionOpen.apply(np.log1p)
+df.EurUsdRate = df.EurUsdRate - 0.7
+df.DaysLeft = df.DaysLeft.astype(int)
+df.DaysAfter = df.DaysAfter.astype(int)
+df.CompetitionOpenNull = df.CompetitionOpenNull + 31
+df['CompetitionOpenNullLog'] = df.CompetitionOpenNull.apply(np.log1p)
+
+new = df
+
+a = new['CompetitionDistance']
+d = new['CompetitionOpen']
+e = new['PromoOpen']
+f = new['CompetitionOpenNull']
+g = new['CompetitionDistanceLog']
+h = new['CompetitionOpenLog']
+i = new['CompetitionOpenNullLog']
+
+a_scaled = featureScaling(a)
+d_scaled = featureScaling(d)
+e_scaled = featureScaling(e)
+f_scaled = featureScaling(f)
+g_scaled = featureScaling(g)
+h_scaled = featureScaling(h)
+i_scaled = featureScaling(i)
+
+new['CompetitionDistance'] = a_scaled
+new['CompetitionOpen'] = d_scaled
+new['PromoOpen'] = e_scaled
+new['CompetitionOpenNull'] = f_scaled
+new['CompetitionDistanceLog'] = g_scaled
+new['CompetitionOpenLog'] = h_scaled
+new['CompetitionOpenNullLog'] = i_scaled
+
+new.to_csv('scaled_test.csv', na_rep='0', header=True, index = False)
