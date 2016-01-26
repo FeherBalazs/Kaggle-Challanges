@@ -1,0 +1,43 @@
+-----------------
+splitter
+-----------------
+
+import pandas as pd
+import numpy as np 
+
+train = pd.read_csv('scaled_train.csv')
+shape =  train.shape 
+
+#shuffle data set, and split to train and test set. 
+df = pd.DataFrame(train)
+shuffled_train = df
+#shuffled_train = df.reindex(np.random.permutation(df.index))
+
+indice_90_percent = int((shape[0]/100.0)* 90)
+indice_5_percent = int((shape[0]/100.0)* 5)
+indice_10_percent = int((shape[0]/100.0)* 10)
+
+indice_15_percent = int((shape[0]/100.0)* 15)
+indice_20_percent = int((shape[0]/100.0)* 20)
+indice_30_percent = int((shape[0]/100.0)* 30)
+indice_40_percent = int((shape[0]/100.0)* 40)
+indice_50_percent = int((shape[0]/100.0)* 50)
+indice_55_percent = int((shape[0]/100.0)* 55)
+
+indice_41089 = int((shape[0]/100.0)* 4.039382231790879)
+
+shuffled_train[:indice_50_percent].to_csv('train_fresh_50_split.csv', index=True, columns=train.columns)
+
+shuffled_train[indice_5_percent:indice_50_percent].to_csv('train_fresh_45_split.csv', index=True, columns=train.columns)
+shuffled_train[indice_55_percent:].to_csv('train_old_45_split.csv', index=True, columns=train.columns)
+
+shuffled_train[:indice_5_percent].to_csv('test_5_split.csv', index=True, columns=train.columns)
+shuffled_train[indice_5_percent:indice_10_percent].to_csv('train_5_split.csv', index=True, columns=train.columns)
+
+shuffled_train[:indice_10_percent].to_csv('test_10_split.csv', index=True, columns=train.columns)
+shuffled_train[indice_10_percent:indice_20_percent].to_csv('train_10_split.csv', index=True, columns=train.columns)
+
+shuffled_train[:indice_15_percent].to_csv('test_15_split.csv', index=True, columns=train.columns)
+shuffled_train[indice_15_percent:].to_csv('train_85_split.csv', index=True, columns=train.columns)
+
+shuffled_train.to_csv('train_full.csv', index=True, columns=df.columns)
